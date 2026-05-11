@@ -15,6 +15,9 @@ services:
       OTEL_SERVICE_NAME: inference-api
       OTEL_RESOURCE_ATTRIBUTES: deployment.environment=lab,service.namespace=aicb
       LOG_LEVEL: INFO
+      LOG_FILE: /app/logs/app.log
+    volumes:
+      - ./logs:/app/logs
     depends_on:
       otel-collector:
         condition: service_started
@@ -108,6 +111,7 @@ services:
       - "127.0.0.1:8888:8888"  # collector self-metrics
     volumes:
       - ./03-tracing-and-logs/otel-collector/otel-config.yaml:/etc/otelcol-contrib/config.yaml:ro
+      - ./logs:/var/log/app:ro
     command: ["--config=/etc/otelcol-contrib/config.yaml"]
     depends_on:
       - jaeger

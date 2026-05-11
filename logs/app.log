@@ -1,0 +1,2 @@
+{"model": "llama3-mock", "input_tokens": 4, "output_tokens": 63, "quality": 0.892, "duration_seconds": 0.2675, "event": "prediction served", "level": "info", "timestamp": "2026-05-11T10:58:15.853491Z", "trace_id": "0b58824d98c775771bebe970f2fd1d73", "span_id": "7c3a456b02bf5457"}
+{"model": "llama3-mock", "input_tokens": 4, "output_tokens": 51, "quality": 0.804, "duration_seconds": 0.1546, "event": "prediction served", "level": "info", "timestamp": "2026-05-11T11:02:45.311133Z", "trace_id": "ff97add545d2ff7b3baeea747979110c", "span_id": "4fafbd76261fb41f"}

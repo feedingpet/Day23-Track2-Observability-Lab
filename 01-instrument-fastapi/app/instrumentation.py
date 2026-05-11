@@ -51,8 +51,8 @@ GPU_UTIL = Gauge(
 tracer = trace.get_tracer(__name__)
 
 
-def setup_otel() -> None:
-    """Configure OTLP trace export + FastAPI auto-instrumentation."""
+def setup_tracer() -> None:
+    """Configure OTLP trace export + structured logging."""
     resource = Resource.create(
         {
             "service.name": os.getenv("OTEL_SERVICE_NAME", "inference-api"),
@@ -69,28 +69,47 @@ def setup_otel() -> None:
         BatchSpanProcessor(OTLPSpanExporter(endpoint=endpoint, insecure=True))
     )
     trace.set_tracer_provider(provider)
-    # Auto-instrument FastAPI handlers (creates server spans for every route)
-    from fastapi import FastAPI  # local import: only needed at setup
-
-    FastAPIInstrumentor().instrument()
     _configure_logging()
 
 
+def instrument_app(app) -> None:
+    """Add FastAPI auto-instrumentation middleware. Must be called BEFORE app starts."""
+    FastAPIInstrumentor.instrument_app(app)
+
+
 def _configure_logging() -> None:
+    def inject_otel_context(logger, method_name, event_dict):
+        span = trace.get_current_span()
+        if span.is_recording():
+            ctx = span.get_span_context()
+            if ctx.is_valid:
+                event_dict["trace_id"] = format(ctx.trace_id, "032x")
+                event_dict["span_id"] = format(ctx.span_id, "016x")
+        return event_dict
+
+    log_file = os.getenv("LOG_FILE")
+    handlers = [logging.StreamHandler(sys.stdout)]
+    if log_file:
+        os.makedirs(os.path.dirname(log_file), exist_ok=True)
+        handlers.append(logging.FileHandler(log_file))
+
     logging.basicConfig(
         format="%(message)s",
-        stream=sys.stdout,
+        handlers=handlers,
         level=os.getenv("LOG_LEVEL", "INFO"),
     )
     structlog.configure(
         processors=[
+            structlog.stdlib.filter_by_level,
             structlog.contextvars.merge_contextvars,
             structlog.processors.add_log_level,
             structlog.processors.TimeStamper(fmt="iso"),
+            inject_otel_context,
             structlog.processors.JSONRenderer(),
         ],
-        wrapper_class=structlog.make_filtering_bound_logger(logging.INFO),
-        logger_factory=structlog.PrintLoggerFactory(),
+        context_class=dict,
+        logger_factory=structlog.stdlib.LoggerFactory(),
+        wrapper_class=structlog.stdlib.BoundLogger,
         cache_logger_on_first_use=True,
     )
 

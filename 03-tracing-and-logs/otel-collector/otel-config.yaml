@@ -18,6 +18,21 @@ receivers:
           static_configs:
             - targets: ['localhost:8888']
 
+  # Thu thập log từ file chung
+  filelog:
+    include: [/var/log/app/*.log]
+    operators:
+      - type: json_parser
+        timestamp:
+          parse_from: attributes.timestamp
+          layout: '%Y-%m-%dT%H:%M:%S.%fZ'
+      - type: move
+        from: attributes.trace_id
+        to: resource["trace_id"]
+      - type: move
+        from: attributes.span_id
+        to: resource["span_id"]
+
 processors:
   batch:
     send_batch_size: 1024
@@ -53,6 +68,12 @@ exporters:
     tls:
       insecure: true
 
+  # Logs → Loki via OTLP/HTTP
+  otlphttp/loki:
+    endpoint: http://day23-loki:3100/otlp
+    tls:
+      insecure: true
+
   debug:
     verbosity: basic
 
@@ -67,6 +88,11 @@ service:
       receivers: [otlp, prometheus]
       processors: [resource, batch]
       exporters: [debug]
+
+    logs:
+      receivers: [otlp, filelog]
+      processors: [resource, batch]
+      exporters: [otlphttp/loki, debug]
 
   telemetry:
     logs:
